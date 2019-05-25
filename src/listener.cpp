@@ -22,7 +22,16 @@ double x = 0.0;
 double y = 0.0;
 double steer_angle = 0.0;
 
+double Ts;
+
+double linear_speed;
+double angular_speed;
+
 double time_left_wheel_old;
+double time_left_wheel_now;
+
+double vL = 0;
+double vR = 0;
 
 class pub_sub
 {
@@ -58,39 +67,48 @@ class pub_sub
 
     }
 
+    void diffdrive_kinematic_forward(double right_wheel_speed, double left_wheel_speed, double steer_angle ){
+
+      count=count+1;
+
+      if (count == 1){
+            Ts = time_left_wheel_now - time_left_wheel_now; 
+        }
+          else{
+            Ts = time_left_wheel_now - time_left_wheel_old;
+          }  
+        
+          //double v = (vL+vR)/2.0;
+          //double w = (vR-vL)/L;
+
+          linear_speed = (vL+vR)/2.0;
+          angular_speed = (vR-vL)/L;
+
+          //x = x + v*Ts*cos((steer_angel*PI/180.0)+((w*Ts)/2));
+          x = x + linear_speed*Ts*cos((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
+          y = y + linear_speed*Ts*sin((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
+          steer_angle = steer_angle*PI/180.0 + (angular_speed*Ts); 
+
+    }
+
   void callback(const odev::floatStamped::ConstPtr& msg1, const odev::floatStamped::ConstPtr& msg2, const odev::floatStamped::ConstPtr& msg3)
   {
-    count=count+1;
+    
     //ROS_INFO ("[counter = %d] Received two messages: (%lf) and (%lf) steer (%lf)",count, msg1->data , msg2->data, msg3->data);
     //ROS_INFO ("[counter = %d] Received two time: (%lf) and (%lf) steer time (%lf)",count, msg1->header.stamp.toSec() , msg2->header.stamp.toSec(), msg3->header.stamp.toSec());
 
-    double vL = msg1->data;
-    double vR = msg2->data;
-    double steer_angel = (msg3->data)/18.0;
+    vL = msg1->data;
+    vR = msg2->data;
+    steer_angle = (msg3->data)/18.0;
 
-    double time_left_wheel_now = msg1->header.stamp.toSec();
+    time_left_wheel_now = msg1->header.stamp.toSec();
  
-    double Ts;
-
-    if (count == 1){
-      Ts = time_left_wheel_now - time_left_wheel_now; 
-   }
-    else{
-      Ts = time_left_wheel_now - time_left_wheel_old;
-    }  
-  
-    double v = (vL+vR)/2.0;
-    double w = (vR-vL)/L;
-
-    x = x + v*Ts*cos((steer_angel*PI/180.0)+((w*Ts)/2));
-    y = y + v*Ts*sin((steer_angel*PI/180.0)+((w*Ts)/2));
-    steer_angel = steer_angel*PI/180.0 + (w*Ts); 
+    diffdrive_kinematic_forward(vR, vL, steer_angle);
 
     time_left_wheel_old = time_left_wheel_now;
     ROS_INFO ("[counter = %d] x_new (%lf) y_new (%lf) Ts (%lf) ",count, x , y, Ts);
 
-    double th = steer_angel*PI/180.0;
-    geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(th);
+    geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(steer_angle*PI/180.0);
 
 
     //first, we'll publish the transform over tf
@@ -122,7 +140,7 @@ class pub_sub
     odom.child_frame_id = "base_link";
     odom.twist.twist.linear.x = vL;
     odom.twist.twist.linear.y = vR;
-    odom.twist.twist.angular.z = th;
+    odom.twist.twist.angular.z = steer_angle*PI/180.0;
 
     //publish the message
     odom_pub.publish(odom); 
