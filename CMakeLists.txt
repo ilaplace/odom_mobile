@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   nav_msgs 
   geometry_msgs
+  dynamic_reconfigure
 )
 
 
@@ -26,6 +27,15 @@ generate_messages(
    tf
    geometry_msgs
  )
+#add dynamic reconfigure api
+#find_package(catkin REQUIRED dynamic_reconfigure)
+generate_dynamic_reconfigure_options(
+  cfg/dyn_param.cfg
+  #...
+)
+
+# make sure configure headers are built before any node using them
+#add_dependencies(listener ${PROJECT_NAME}_gencfg)
 
 catkin_package(CATKIN_DEPENDS message_runtime message_filters)
 
@@ -36,6 +46,7 @@ include
 )
 
 
-
 add_executable(listener src/listener.cpp)
 target_link_libraries(listener ${catkin_LIBRARIES})
+
+
