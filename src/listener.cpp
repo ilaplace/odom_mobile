@@ -11,6 +11,12 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/TransformStamped.h>
+
+#include <dynamic_reconfigure/server.h>
+#include "odev/dyn_paramConfig.h"
+
+
+
 using namespace message_filters;
 
 const double PI=3.1415926535897932;
@@ -42,7 +48,8 @@ class pub_sub
   message_filters::Subscriber<odev::floatStamped> L_speed;
   message_filters::Subscriber<odev::floatStamped> R_speed;
   message_filters::Subscriber<odev::floatStamped> steer;
-  
+  dynamic_reconfigure::Server<odev::dyn_paramConfig> server;
+  dynamic_reconfigure::Server<odev::dyn_paramConfig>::CallbackType f;
   tf::TransformBroadcaster odom_broadcaster;
 
   typedef sync_policies::ApproximateTime <odev::floatStamped, odev::floatStamped, odev::floatStamped> MySyncPolicy;
@@ -54,6 +61,8 @@ class pub_sub
 
     pub_sub()
     {
+      f = boost::bind(&pub_sub::dynamic_callback, this, _1, _2);
+      server.setCallback(f);
 
       L_speed.subscribe(n, "speedL_stamped", 1);
       R_speed.subscribe(n,"speedR_stamped",1);
@@ -78,19 +87,34 @@ class pub_sub
             Ts = time_left_wheel_now - time_left_wheel_old;
           }  
         
-          //double v = (vL+vR)/2.0;
-          //double w = (vR-vL)/L;
-
           linear_speed = (vL+vR)/2.0;
           angular_speed = (vR-vL)/L;
+          
 
-          //x = x + v*Ts*cos((steer_angel*PI/180.0)+((w*Ts)/2));
-          x = x + linear_speed*Ts*cos((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
-          y = y + linear_speed*Ts*sin((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
-          steer_angle = steer_angle*PI/180.0 + (angular_speed*Ts); 
+     
 
     }
+ void ackerman_kinematic_forward(double right_wheel_speed, double left_wheel_speed, double steer_angle ){
 
+      count=count+1;
+      steer_angle = steer_angle/18;
+
+      if (count == 1){
+            Ts = time_left_wheel_now - time_left_wheel_now; 
+        }
+          else{
+            Ts = time_left_wheel_now - time_left_wheel_old;
+          }  
+        
+          linear_speed = (vL+vR)/2.0;
+          angular_speed = (vR-vL)/L;
+          
+
+     
+    }
+  void dynamic_callback(odev::dyn_paramConfig &config, uint32_t level){
+    ROS_INFO("ahoy ahoy %d", config.int_param);
+  }
   void callback(const odev::floatStamped::ConstPtr& msg1, const odev::floatStamped::ConstPtr& msg2, const odev::floatStamped::ConstPtr& msg3)
   {
     
@@ -99,12 +123,16 @@ class pub_sub
 
     vL = msg1->data;
     vR = msg2->data;
-    steer_angle = (msg3->data)/18.0;
+    steer_angle = (msg3->data)/1.0;
 
     time_left_wheel_now = msg1->header.stamp.toSec();
  
     diffdrive_kinematic_forward(vR, vL, steer_angle);
-
+    
+    
+    x = x + linear_speed*Ts*cos((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
+    y = y + linear_speed*Ts*sin((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
+    steer_angle = steer_angle*PI/180.0 + (angular_speed*Ts);   
     time_left_wheel_old = time_left_wheel_now;
     ROS_INFO ("[counter = %d] x_new (%lf) y_new (%lf) Ts (%lf) ",count, x , y, Ts);
 
