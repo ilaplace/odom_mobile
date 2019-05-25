@@ -22,6 +22,7 @@ double x = 0.0;
 double y = 0.0;
 double steer_angle = 0.0;
 
+<<<<<<< HEAD
 double Ts;
 
 double linear_speed;
@@ -32,6 +33,9 @@ double time_left_wheel_now;
 
 double vL = 0;
 double vR = 0;
+=======
+double time_left_wheel_old;
+>>>>>>> 82d45739e690704fdc77dc6c199491f164169349
 
 class pub_sub
 {
@@ -67,6 +71,7 @@ class pub_sub
 
     }
 
+<<<<<<< HEAD
     void diffdrive_kinematic_forward(double right_wheel_speed, double left_wheel_speed, double steer_angle ){
 
       count=count+1;
@@ -104,11 +109,45 @@ class pub_sub
     time_left_wheel_now = msg1->header.stamp.toSec();
  
     diffdrive_kinematic_forward(vR, vL, steer_angle);
+=======
+  void callback(const odev::floatStamped::ConstPtr& msg1, const odev::floatStamped::ConstPtr& msg2, const odev::floatStamped::ConstPtr& msg3)
+  {
+    count=count+1;
+    //ROS_INFO ("[counter = %d] Received two messages: (%lf) and (%lf) steer (%lf)",count, msg1->data , msg2->data, msg3->data);
+    //ROS_INFO ("[counter = %d] Received two time: (%lf) and (%lf) steer time (%lf)",count, msg1->header.stamp.toSec() , msg2->header.stamp.toSec(), msg3->header.stamp.toSec());
+
+    double vL = msg1->data;
+    double vR = msg2->data;
+    double steer_angel = (msg3->data)/18.0;
+
+    double time_left_wheel_now = msg1->header.stamp.toSec();
+ 
+    double Ts;
+
+    if (count == 1){
+      Ts = time_left_wheel_now - time_left_wheel_now; 
+   }
+    else{
+      Ts = time_left_wheel_now - time_left_wheel_old;
+    }  
+  
+    double v = (vL+vR)/2.0;
+    double w = (vR-vL)/L;
+
+    x = x + v*Ts*cos((steer_angel*PI/180.0)+((w*Ts)/2));
+    y = y + v*Ts*sin((steer_angel*PI/180.0)+((w*Ts)/2));
+    steer_angel = steer_angel*PI/180.0 + (w*Ts); 
+>>>>>>> 82d45739e690704fdc77dc6c199491f164169349
 
     time_left_wheel_old = time_left_wheel_now;
     ROS_INFO ("[counter = %d] x_new (%lf) y_new (%lf) Ts (%lf) ",count, x , y, Ts);
 
+<<<<<<< HEAD
     geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(steer_angle*PI/180.0);
+=======
+    double th = steer_angel*PI/180.0;
+    geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(th);
+>>>>>>> 82d45739e690704fdc77dc6c199491f164169349
 
 
     //first, we'll publish the transform over tf
@@ -140,7 +179,11 @@ class pub_sub
     odom.child_frame_id = "base_link";
     odom.twist.twist.linear.x = vL;
     odom.twist.twist.linear.y = vR;
+<<<<<<< HEAD
     odom.twist.twist.angular.z = steer_angle*PI/180.0;
+=======
+    odom.twist.twist.angular.z = th;
+>>>>>>> 82d45739e690704fdc77dc6c199491f164169349
 
     //publish the message
     odom_pub.publish(odom); 
