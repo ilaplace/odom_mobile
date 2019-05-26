@@ -1,6 +1,6 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
-#include "odev/floatStamped.h"
+
 #include <message_filters/subscriber.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/time_synchronizer.h>
@@ -13,6 +13,9 @@
 #include <geometry_msgs/TransformStamped.h>
 
 #include <dynamic_reconfigure/server.h>
+
+#include "odev/floatStamped.h"
+#include "odev/sourcedOdom.h"
 #include "odev/dyn_paramConfig.h"
 
 
@@ -43,6 +46,9 @@ class pub_sub
 {
 
   private:
+
+  bool diffdrive = true;
+
   ros::NodeHandle n;    
   ros::Publisher odom_pub;
   message_filters::Subscriber<odev::floatStamped> L_speed;
@@ -68,7 +74,7 @@ class pub_sub
       R_speed.subscribe(n,"speedR_stamped",1);
       steer.subscribe(n, "steer_stamped", 1);
       //odom_pub.publish(n.advertise<nav_msgs::Odometry>("odom",50));
-      odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);
+      odom_pub = n.advertise<odev::sourcedOdom>("odom", 50);
   
 
       sync.reset(new Sync(MySyncPolicy(10), L_speed, R_speed, steer));
@@ -91,8 +97,6 @@ class pub_sub
           angular_speed = (vR-vL)/L;
           
 
-     
-
     }
  void ackerman_kinematic_forward(double right_wheel_speed, double left_wheel_speed, double steer_angle ){
 
@@ -113,7 +117,9 @@ class pub_sub
      
     }
   void dynamic_callback(odev::dyn_paramConfig &config, uint32_t level){
-    ROS_INFO("ahoy ahoy %d", config.int_param);
+  
+    diffdrive=config.bool_param;
+    ROS_INFO("diffdrive is %d", config.bool_param);
   }
   void callback(const odev::floatStamped::ConstPtr& msg1, const odev::floatStamped::ConstPtr& msg2, const odev::floatStamped::ConstPtr& msg3)
   {
@@ -123,17 +129,25 @@ class pub_sub
 
     vL = msg1->data;
     vR = msg2->data;
-    steer_angle = (msg3->data)/1.0;
+    steer_angle = (msg3->data);
 
     time_left_wheel_now = msg1->header.stamp.toSec();
+    odev::sourcedOdom odom;
  
-    diffdrive_kinematic_forward(vR, vL, steer_angle);
-    
+    if (diffdrive){
+      diffdrive_kinematic_forward(vR, vL, steer_angle);
+      odom.source = "diffdrive";
+    }
+    else
+    {
+      ackerman_kinematic_forward(vR, vL, steer_angle);
+      odom.source = "ackerman";
+    }
     
     x = x + linear_speed*Ts*cos((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
     y = y + linear_speed*Ts*sin((steer_angle*PI/180.0)+((angular_speed*Ts)/2));
     steer_angle = steer_angle*PI/180.0 + (angular_speed*Ts);   
-    time_left_wheel_old = time_left_wheel_now;
+   
     ROS_INFO ("[counter = %d] x_new (%lf) y_new (%lf) Ts (%lf) ",count, x , y, Ts);
 
     geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(steer_angle*PI/180.0);
@@ -154,7 +168,8 @@ class pub_sub
     odom_broadcaster.sendTransform(odom_trans);
     //odom_broadcaster.sendTransform(odom_trans.transform, ros::Time::now(), "world", "turtle"));
     //next, we'll publish the odometry message over ROS
-    nav_msgs::Odometry odom;
+    //nav_msgs::Odometry odom;
+    
     odom.header.stamp = msg1->header.stamp;
     odom.header.frame_id = "world";
 
@@ -166,12 +181,16 @@ class pub_sub
 
     //set the velocity
     odom.child_frame_id = "base_link";
-    odom.twist.twist.linear.x = vL;
-    odom.twist.twist.linear.y = vR;
-    odom.twist.twist.angular.z = steer_angle*PI/180.0;
+    odom.twist.twist.linear.x = linear_speed*cos(steer_angle*PI/180.0);
+    odom.twist.twist.linear.y = linear_speed*sin(steer_angle*PI/180.0);
+    odom.twist.twist.angular.z = angular_speed;
 
+
+    
     //publish the message
     odom_pub.publish(odom); 
+    
+    time_left_wheel_old = time_left_wheel_now;
   }
 
 
