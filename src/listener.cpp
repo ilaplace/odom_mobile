@@ -27,25 +27,26 @@ const double PI=3.1415926535897932;
 int count = 0;
 double L=1.3; //distance between two wheel (meter)
 
-double x = 0.0;
-double y = 0.0;
-double steer_angle = 0.0;
-
-double Ts;
-
-double linear_speed;
-double angular_speed;
-
-double time_left_wheel_old;
-double time_left_wheel_now;
-
-double vL = 0;
-double vR = 0;
 
 class pub_sub
 {
 
   private:
+  double x = 0.0;
+  double y = 0.0;
+  double steer_angle = 0.0;
+
+  double Ts;
+
+  double linear_speed;
+  double angular_speed;
+
+  double time_left_wheel_old;
+  double time_left_wheel_now;
+
+  double vL = 0;
+  double vR = 0;
+
 
   bool diffdrive = true;
 
@@ -119,6 +120,8 @@ class pub_sub
   void dynamic_callback(odev::dyn_paramConfig &config, uint32_t level){
   
     diffdrive=config.bool_param;
+    x= config.double_param_x;
+    y= config.double_param_y;
     ROS_INFO("diffdrive is %d", config.bool_param);
   }
   void callback(const odev::floatStamped::ConstPtr& msg1, const odev::floatStamped::ConstPtr& msg2, const odev::floatStamped::ConstPtr& msg3)
